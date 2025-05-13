@@ -1,8 +1,22 @@
-import React from 'react';
-import { useWallet } from '../hooks/useWallet'; // Make sure this file exists
+import React, { useEffect, useState } from 'react';
+import { useWallet } from '../hooks/useWallet';
+import { useLendingPool } from '../hooks/useLendingPool';
+import { ethers } from 'ethers';
 
 export default function DefilordLanding() {
   const { account, connectWallet } = useWallet();
+  const provider = window.ethereum ? new ethers.BrowserProvider(window.ethereum) : null;
+
+  const { depositUSDT, withdrawAll, getUserTotalBalance } = useLendingPool(provider);
+  const usdtAddress = "0x2f3A40A3db8a7e3D09B0adfEfbCe4f6F81927557"; // Sepolia USDT
+
+  const [balance, setBalance] = useState({ principal: "0", interest: "0" });
+
+  useEffect(() => {
+    if (account) {
+      getUserTotalBalance(account).then(setBalance);
+    }
+  }, [account]);
 
   return (
     <main style={{
@@ -61,6 +75,36 @@ export default function DefilordLanding() {
           }}>{item}</button>
         ))}
       </nav>
+
+      {/* Dashboard */}
+      {account && (
+        <section style={{
+          maxWidth: '600px',
+          margin: '0 auto 2rem auto',
+          border: '1px solid #fff',
+          padding: '1.5rem',
+          borderRadius: '8px',
+          textAlign: 'center'
+        }}>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Your Lending Portfolio</h2>
+          <p><strong>Principal:</strong> {balance.principal} USDT</p>
+          <p><strong>Interest:</strong> {balance.interest} USDT</p>
+          <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <button
+              onClick={() => depositUSDT("100", usdtAddress)}
+              style={{ padding: '0.5rem 1rem', backgroundColor: '#fff', color: '#000', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Deposit 100 USDT
+            </button>
+            <button
+              onClick={withdrawAll}
+              style={{ padding: '0.5rem 1rem', backgroundColor: '#fff', color: '#000', borderRadius: '6px', cursor: 'pointer' }}
+            >
+              Withdraw All
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Cards */}
       <section style={{
