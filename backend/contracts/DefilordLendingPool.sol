@@ -9,11 +9,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract DefilordLendingPool is ReentrancyGuard, Pausable, Ownable {
     IERC20 public immutable usdt;
     uint256 public fixedAPY = 500; // 5.00% in basis points
-    uint256 public constant MAX_APY = 2000; // Max 20%
+    uint256 public constant MAX_APY = 2000;
     uint256 public constant MIN_LOCKUP_DURATION = 7 days;
-    uint256 public constant MAX_USER_DEPOSIT = 100_000 * 1e6; // max 100K USDT per user
+    uint256 public constant MAX_USER_DEPOSIT = 100_000 * 1e6;
     uint256 public totalDeposits;
-    uint256 public depositCap = 1_000_000 * 1e6; // 1M USDT global cap
+    uint256 public depositCap = 1_000_000 * 1e6;
+    uint256 public allocatedFunds; // ✅ new
 
     struct DepositInfo {
         uint256 amount;
@@ -27,6 +28,7 @@ contract DefilordLendingPool is ReentrancyGuard, Pausable, Ownable {
     event Withdrawn(address indexed user, uint256 amount, uint256 interest);
     event APYChanged(uint256 newAPY);
     event CapUpdated(uint256 newCap);
+    event FundsAllocated(address vault, uint256 amount); // ✅ new
 
     constructor(address _usdt) {
         require(_usdt != address(0), "Invalid USDT address");
@@ -93,8 +95,8 @@ contract DefilordLendingPool is ReentrancyGuard, Pausable, Ownable {
         }
 
         delete deposits[msg.sender];
-        totalDeposits -= totalWithdraw;
         userTotalDeposited[msg.sender] = 0;
+        totalDeposits -= totalWithdraw;
 
         require(usdt.transfer(msg.sender, totalWithdraw + totalInterest), "Withdraw failed");
         emit Withdrawn(msg.sender, totalWithdraw, totalInterest);
@@ -110,6 +112,14 @@ contract DefilordLendingPool is ReentrancyGuard, Pausable, Ownable {
             principal += infos[i].amount;
             interest += calculateInterest(infos[i]);
         }
-        return (principal, interest);
+    }
+
+    // ✅ NEW: Allocate excess capital to strategy vaults
+    function allocateExcessToStrategy(address vault, uint256 amount) external onlyOwner {
+        uint256 available = totalDeposits - allocatedFunds;
+        require(amount <= available, "Not enough unallocated funds");
+        allocatedFunds += amount;
+        require(usdt.transfer(vault, amount), "Transfer to strategy failed");
+        emit FundsAllocated(vault, amount);
     }
 }
